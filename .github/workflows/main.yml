@@ -2,73 +2,85 @@ name: Node.js CI/CD and Keep Alive
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
   schedule:
-    - cron: '45 */6 * * *'
+    # Runs every 45 minutes
+    - cron: '*/45 * * * *'
   workflow_dispatch:
 
 jobs:
+  # Job 1: Build and Start Application
   build_and_start:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20.x]
-        
+        node-version: [20.x] # Use 20.x (LTS)
+    
+    # This job only runs on 'push' or 'pull_request' events, not 'schedule'
     if: github.event_name != 'schedule'
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
+      - name: Set Up Node.js
+        # Recommended to use a newer version (e.g., v4 or v5)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
 
-    - name: Install dependencies
-      run: npm install
+      - name: Install dependencies
+        run: npm install
 
-    - name: Start application
-      run: npm start
+      - name: Start application
+        # This will run your application. In a real CI/CD, you might have 'npm test' or 'npm build' here.
+        run: npm start
 
+  ---
+
+  # Job 2: Keep Alive Commit (Scheduled only)
   keep_alive_commit:
-    runs-on: ubuntu-latest
-    
+    # CRITICAL FIX: The correct condition for scheduled workflows
     if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
 
     permissions:
-      contents: write 
-      actions: write 
-
+      contents: write
+      actions: write
+      
     steps:
-    - name: Cancel Previous Keep Alive Workflows
-      uses: styfle/cancel-workflow-action@0.12.1
-      with:
-        access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Cancel Previous Keep Alive Workflows
+        uses: styfle/cancel-workflow-action@0.12.1
+        with:
+          access_token: ${{ secrets.GITHUB_TOKEN }} # Use GITHUB_TOKEN
 
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0 
+      - name: Checkout Repository
+        # Recommended to use a newer version
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Need full history for 'git auto-commit'
 
-    - name: Update asitha2.json with current timestamp
-      id: update_time
-      run: |
-        CURRENT_TIME=$(date +%s%3N)
-        echo "{\"lastActive\": \"$CURRENT_TIME\"}" > asitha2.json
-        
-    - name: Setup Git User
-      run: |
-        git config user.name "MR Asitha ❤️"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Update asitha2.json with current timestamp
+        id: update_time
+        # Uses 'date +%s%3N' to get time in milliseconds.
+        run: |
+          CURRENT_TIME=$(date +%s%3N)
+          echo '{"lastActive": "'$CURRENT_TIME'"}' > asitha2.json
 
-    - name: Commit and Push Changes
-      id: commit
-      uses: stefanzweifel/git-auto-commit-action@v5
-      with:
-        commit_message: "MR Asitha ❤️: Keep Alive ping"
-        token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Git User
+        run: |
+          git config --global user.name "MR Asitha ❤️"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and Push Changes
+        # This will automatically check for changes in asitha2.json and commit/push if found
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "MR Asitha ❤️ Keep Alive ping"
+          # GITHUB_TOKEN is sufficient for pushing the commit
+          token: ${{ secrets.GITHUB_TOKEN }} 
+          
+      # CRITICAL FIX: Removed the unnecessary/incorrect 'Keep Alive ping' step here.
+      
